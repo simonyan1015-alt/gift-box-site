@@ -42,21 +42,27 @@
   Object.keys(ov).forEach(function (k) { setPath(S, k, ov[k]); });
 
   /* ---------- language ---------- */
+  var LANGS = ["en", "zh", "de", "fr"];
+  var LANG_CODE = { en: "EN", zh: "ZH", de: "DE", fr: "FR" };
+  var LANG_HTML = { en: "en", zh: "zh-CN", de: "de", fr: "fr" };
+  var LANG_NAME = { en: "English", zh: "中文", de: "Deutsch", fr: "Français" };
+
   var qs = new URLSearchParams(location.search);
   var lang = qs.get("lang") || localStorage.getItem(LANG_KEY) || "en";
-  if (lang !== "en" && lang !== "zh") lang = "en";
+  if (LANGS.indexOf(lang) < 0) lang = "en";
   function t(v) {
     if (v && typeof v === "object" && !Array.isArray(v) && "en" in v) {
       return v[lang] != null && v[lang] !== "" ? v[lang] : v.en;
     }
     return v == null ? "" : v;
   }
+  function ui(en, zh) { return lang === "zh" ? zh : en; }
 
   /* ======================================================================
      RENDER
      ====================================================================== */
   function render() {
-    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    document.documentElement.lang = LANG_HTML[lang] || "en";
 
     document.title = t(S.seo.title);
     var md = $('meta[name="description"]');
@@ -165,10 +171,14 @@
     }).join("");
     if (keep) sel.value = keep;
 
-    /* --- lang buttons --- */
-    $$(".lang button").forEach(function (b) {
-      b.classList.toggle("on", b.getAttribute("data-lang") === lang);
+    /* --- language switcher --- */
+    var cur = $("#langCur");
+    if (cur) cur.textContent = LANG_CODE[lang] || "EN";
+    $$("#langMenu [data-lang]").forEach(function (b) {
+      var on = b.getAttribute("data-lang") === lang;
+      b.setAttribute("aria-selected", on ? "true" : "false");
     });
+    $("#langBtn").setAttribute("aria-label", ui("Language", "语言") + ": " + (LANG_NAME[lang] || "English"));
 
     /* --- images (after all dynamic lists exist) --- */
     $$("[data-img]").forEach(function (img) {
@@ -215,13 +225,34 @@
   }, true);
 
   /* ======================================================================
-     LANGUAGE
+     LANGUAGE — dropdown
      ====================================================================== */
-  $$(".lang button").forEach(function (b) {
+  var langWrap = $("#lang");
+  var langBtn = $("#langBtn");
+  var langMenu = $("#langMenu");
+
+  function openLang(open) {
+    langWrap.classList.toggle("open", open);
+    langBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    langMenu.hidden = !open;
+  }
+  langBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    openLang(langMenu.hidden);
+  });
+  document.addEventListener("click", function (e) {
+    if (!langMenu.hidden && !langWrap.contains(e.target)) openLang(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !langMenu.hidden) { openLang(false); langBtn.focus(); }
+  });
+
+  $$("#langMenu [data-lang]").forEach(function (b) {
     b.addEventListener("click", function () {
       lang = b.getAttribute("data-lang");
       localStorage.setItem(LANG_KEY, lang);
-      $("#editFlag").textContent = editing ? (lang === "en" ? "Editing · English" : "编辑中 · 中文") : "";
+      $("#editFlag").textContent = editing ? flagText() : "";
+      openLang(false);
       render();
     });
   });
@@ -265,7 +296,7 @@
     });
     if (!ok) { toast(lang === "zh" ? "请填写称呼和有效邮箱" : "Please add your name and a valid email"); return; }
 
-    var to = "sales@meridianpack.com";
+    var to = "Simonyan1015@gmail.com";
     var first = S.contact.rows[0];
     if (first && typeof first.v === "string" && first.v.indexOf("@") > -1) to = first.v;
     var interest = t(S.contact.labels.options[Number(f.interest.value)] || {});
@@ -402,14 +433,19 @@
     im.src = url;
   }
 
+  function flagText() {
+    if (lang === "zh") return "编辑中 · 中文";
+    return "Editing · " + (LANG_NAME[lang] || "English");
+  }
+
   function setEditing(on) {
     editing = on;
     document.body.classList.toggle("editing", on);
     bar.hidden = !on;
     toggle.style.display = on ? "none" : "";
-    flag.textContent = on ? (lang === "en" ? "Editing · English" : "编辑中 · 中文") : "";
+    flag.textContent = on ? flagText() : "";
     $("#editHint").textContent = on
-      ? (lang === "zh" ? "点击文字直接修改；点图片中央按钮可替换图片。修改会自动保存到本机浏览器。" : "Click any text to edit. Use the button on an image to replace it. Changes save in this browser automatically.")
+      ? (lang === "zh" ? "点击文字直接修改；点图片右上角按钮可替换图片。修改会自动保存到本机浏览器。" : "Click any text to edit. Use the button on an image to replace it. Changes save in this browser automatically.")
       : "";
     if (on) { applyEdit(); window.scrollTo({ top: 0, behavior: "smooth" }); }
     else { clearEditState(); }
